@@ -19,10 +19,19 @@
 namespace
 {
 
+using PBArena = google::protobuf::Arena;
+
 class ReplayContext final : public YGOpen::Codec::IEncodeContext
 {
 public:
-	ReplayContext() : board_(), match_win_reason_(0), left_() {}
+	ReplayContext()
+		: board_()
+		, arena_()
+		, replay_(*PBArena::CreateMessage<YGOpen::Proto::Replay>(&arena_))
+		, last_msg_()
+		, match_win_reason_(0)
+		, left_()
+	{}
 
 	auto pile_size(Con con, Loc loc) const noexcept -> size_t override
 	{
@@ -67,8 +76,16 @@ public:
 		left_[left] = from;
 	}
 
+	auto arena() noexcept -> google::protobuf::Arena& { return arena_; }
+
 	auto parse(YGOpen::Proto::Duel::Msg& msg) noexcept -> void
 	{
+		// Append message to the stream.
+		{
+			auto* block = replay_.mutable_stream()->add_blocks();
+			block->set_time_offset_ms(0U);
+			block->unsafe_arena_set_allocated_msg(&msg);
+		}
 		if(msg.t_case() == YGOpen::Proto::Duel::Msg::kEvent)
 			parse_event(board_, msg.event());
 		using namespace YGOpen::Client;
@@ -121,6 +138,11 @@ public:
 		}
 	}
 
+	auto serialize() noexcept -> std::string
+	{
+		return replay_.SerializeAsString();
+	}
+
 private:
 	template<typename T>
 	using WrapperType = YGOpen::Client::Value<T>;
@@ -128,6 +150,8 @@ private:
 	using FrameType = YGOpen::Client::BasicFrame<CardType>;
 	using BoardType = YGOpen::Client::BasicBoard<FrameType, WrapperType>;
 	BoardType board_;
+	PBArena arena_;
+	YGOpen::Proto::Replay& replay_;
 
 	// Encoder context data.
 	uint32_t match_win_reason_;
@@ -140,15 +164,6 @@ private:
 auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 {
 	decltype(buffer) const sentry = buffer;
-	google::protobuf::Arena arena;
-	auto* replay = arena.CreateMessage<YGOpen::Proto::Replay>(&arena);
-	auto* stream = replay->mutable_stream();
-	auto add_msg = [&](YGOpen::Proto::Duel::Msg* msg)
-	{
-		auto* block = stream->add_blocks();
-		block->set_time_offset_ms(0U);
-		block->unsafe_arena_set_allocated_msg(msg);
-	};
 	ReplayContext ctx;
 	for(;;)
 	{
@@ -172,22 +187,20 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 			break;
 		// Actual encoding.
 		using namespace YGOpen::Codec;
-		auto r = Edo9300::OCGCore::encode_one(arena, buffer);
+		auto r = Edo9300::OCGCore::encode_one(ctx.arena(), buffer);
 		switch(r.state)
 		{
 		case EncodeOneResult::State::STATE_OK:
 		{
 			ctx.parse(*r.msg);
-			add_msg(r.msg);
 			break;
 		}
 		case EncodeOneResult::State::STATE_SPECIAL:
 		{
-			r = Edo9300::OCGCore::encode_one_special(arena, ctx, buffer);
+			r = Edo9300::OCGCore::encode_one_special(ctx.arena(), ctx, buffer);
 			if(r.state == EncodeOneResult::State::STATE_OK)
 			{
 				ctx.parse(*r.msg);
-				add_msg(r.msg);
 			}
 			else if(r.state != EncodeOneResult::State::STATE_SWALLOWED)
 			{
@@ -208,5 +221,5 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 		assert((msg_props.second + 1U) == r.bytes_read);
 		buffer += r.bytes_read;
 	}
-	return replay->SerializeAsString();
+	return ctx.serialize();
 }
