@@ -22,17 +22,21 @@ namespace
 class ReplayContext final : public YGOpen::Codec::IEncodeContext
 {
 public:
-	ReplayContext() : board_(), match_kill_reason_(0), left_() {}
+	ReplayContext() : board_(), match_win_reason_(0), left_() {}
 
 	auto pile_size(Con con, Loc loc) const noexcept -> size_t override
 	{
 		return board_.frame().pile(con, loc).size();
 	}
 
+	auto get_match_win_reason() const noexcept -> uint32_t override
+	{
+		return match_win_reason_;
+	}
+
 	auto has_xyz_mat(Place const& p) const noexcept -> bool override
 	{
-		auto const& z = board_.frame().zone(p.con(), p.loc(), p.seq());
-		return !z.materials.empty();
+		return !board_.frame().zone(p).materials.empty();
 	}
 
 	auto get_xyz_left(Place const& left) const noexcept -> Place override
@@ -40,9 +44,9 @@ public:
 		return left_.find(left)->second;
 	}
 
-	auto match_kill_reason(uint32_t reason) noexcept -> void override
+	auto match_win_reason(uint32_t reason) noexcept -> void override
 	{
-		match_kill_reason_ = reason;
+		match_win_reason_ = reason;
 	}
 
 	auto xyz_mat_defer(Place const& place) noexcept -> void override
@@ -82,9 +86,12 @@ public:
 			auto const hits = parse_query<true>(board_.frame(), *it);
 			auto* data = it->mutable_data();
 			using namespace YGOpen::Client;
-#define X(v, q)                       \
-	if(!!(hits & (QueryCacheHit::q))) \
-	data->clear_##v()
+#define X(v, q)                           \
+	do                                    \
+	{                                     \
+		if(!!(hits & (QueryCacheHit::q))) \
+			data->clear_##v();            \
+	} while(0)
 			X(owner, OWNER);
 			X(is_public, IS_PUBLIC);
 			X(is_hidden, IS_HIDDEN);
@@ -123,7 +130,7 @@ private:
 	BoardType board_;
 
 	// Encoder context data.
-	uint32_t match_kill_reason_;
+	uint32_t match_win_reason_;
 	std::map<Place, Place, YGOpen::Proto::Duel::PlaceLess> left_;
 	std::vector<Place> deferred_;
 };
