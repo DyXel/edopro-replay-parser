@@ -163,15 +163,20 @@ private:
 
 auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 {
-	decltype(buffer) const sentry = buffer;
+	decltype(buffer) const sentry = buffer + size;
 	ReplayContext ctx;
 	for(;;)
 	{
-		if((sentry + size) == buffer) // Consumed entire buffer.
+		if(sentry == buffer) // Consumed entire buffer.
 			break;
+		if(sentry < buffer + sizeof(uint8_t) + sizeof(uint32_t))
+		{
+			std::cerr << "yrp: Unexpectedly short size for next message.\n";
+			std::exit(6U);
+		}
 		// NOTE: Replays have size and msg_type swapped for some reason, we do
 		// that swap here before trying to encode.
-		auto const msg_props = [&]() -> std::pair<uint8_t, uint32_t>
+		auto const [msg_type, msg_size] = [&]() -> std::pair<uint8_t, uint32_t>
 		{
 			uint8_t msg{};
 			uint32_t size{};
@@ -183,7 +188,7 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 		}();
 		// We do not parse old replay format message.
 		constexpr uint8_t OLD_REPLAY_FORMAT = 231U;
-		if(msg_props.first == OLD_REPLAY_FORMAT)
+		if(msg_type == OLD_REPLAY_FORMAT)
 			break;
 		// Actual encoding.
 		using namespace YGOpen::Codec;
@@ -204,7 +209,7 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 			}
 			else if(r.state != EncodeOneResult::State::STATE_SWALLOWED)
 			{
-				std::exit(6U);
+				std::exit(7U);
 			}
 			break;
 		}
@@ -215,10 +220,10 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 		}
 		default: // EncodeOneResult::State::STATE_UNKNOWN
 			std::cerr << "yrp: Encountered unknown core message number: ";
-			std::cerr << static_cast<int>(msg_props.first) << ".\n";
-			std::exit(7U);
+			std::cerr << static_cast<int>(msg_type) << ".\n";
+			std::exit(8U);
 		}
-		assert((msg_props.second + 1U) == r.bytes_read);
+		assert((msg_size + 1U) == r.bytes_read);
 		buffer += r.bytes_read;
 	}
 	return ctx.serialize();
