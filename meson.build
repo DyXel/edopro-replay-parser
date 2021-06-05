@@ -10,4 +10,4 @@ erp_src = files([
 	'src/LZMA/LzmaDec.c'
 ])
 
-erp_exe = executable('yrp', erp_src, c_args: '-D_7ZIP_ST', dependencies : ygopen_dep)
+erp_exe = executable('erp', erp_src, c_args: '-D_7ZIP_ST', dependencies : ygopen_dep)
