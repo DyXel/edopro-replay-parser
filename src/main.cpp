@@ -3,6 +3,8 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
+#include <google/protobuf/stubs/common.h>
+
 #include <cstring> // std::memcpy
 #include <fstream>
 #include <iostream>
@@ -70,6 +72,7 @@ struct ReplayHeader
 
 auto main(int argc, char* argv[]) -> int
 {
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
 	if(argc < 2)
 	{
 		std::cerr << "yrp: No input file, yrpX file expected.\n";
@@ -147,5 +150,6 @@ auto main(int argc, char* argv[]) -> int
 	std::fstream{std::string{argv[1]} + ".pb",
 	             std::ios_base::binary | std::ios_base::out}
 		<< replay_bin;
+	google::protobuf::ShutdownProtobufLibrary();
 	return 0;
 }
