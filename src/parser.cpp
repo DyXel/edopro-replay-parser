@@ -194,30 +194,30 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 		auto r = Edo9300::OCGCore::encode_one(ctx.arena(), buffer);
 		switch(r.state)
 		{
-		case EncodeOneResult::State::STATE_OK:
+		case EncodeOneResult::State::OK:
 		{
 			ctx.parse(*r.msg);
 			break;
 		}
-		case EncodeOneResult::State::STATE_SPECIAL:
+		case EncodeOneResult::State::SPECIAL:
 		{
 			r = Edo9300::OCGCore::encode_one_special(ctx.arena(), ctx, buffer);
-			if(r.state == EncodeOneResult::State::STATE_OK)
+			if(r.state == EncodeOneResult::State::OK)
 			{
 				ctx.parse(*r.msg);
 			}
-			else if(r.state != EncodeOneResult::State::STATE_SWALLOWED)
+			else if(r.state != EncodeOneResult::State::SWALLOWED)
 			{
 				std::exit(7U);
 			}
 			break;
 		}
-		case EncodeOneResult::State::STATE_SWALLOWED:
+		case EncodeOneResult::State::SWALLOWED:
 		{
 			// NOTE: Don't care about non-special swallowed messages.
 			break;
 		}
-		default: // EncodeOneResult::State::STATE_UNKNOWN
+		default: // EncodeOneResult::State::UNKNOWN
 			std::cerr << "yrp: Encountered unknown core message number: ";
 			std::cerr << static_cast<int>(msg_type) << ".\n";
 			std::exit(8U);
