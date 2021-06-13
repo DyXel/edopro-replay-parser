@@ -24,11 +24,10 @@ using PBArena = google::protobuf::Arena;
 class ReplayContext final : public YGOpen::Codec::IEncodeContext
 {
 public:
-	ReplayContext()
+	ReplayContext() noexcept
 		: board_()
 		, arena_()
 		, replay_(*PBArena::CreateMessage<YGOpen::Proto::Replay>(&arena_))
-		, last_msg_()
 		, match_win_reason_(0)
 		, left_()
 	{}
@@ -70,7 +69,7 @@ public:
 		return taken;
 	}
 
-	virtual auto xyz_left(Place const& left, Place const& from) noexcept
+	auto xyz_left(Place const& left, Place const& from) noexcept
 		-> void override
 	{
 		left_[left] = from;
