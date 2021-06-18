@@ -70,17 +70,11 @@ ForEachMacros:
   - BOOST_FOREACH
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: ^<ext/.*\.h>
-    Priority: 2
-    SortPriority: 0
-  - Regex: ^<.*\.h>
+  - Regex: ^<.*
     Priority: 1
     SortPriority: 0
-  - Regex: ^<.*
-    Priority: 2
-    SortPriority: 0
   - Regex: .*
-    Priority: 3
+    Priority: 2
     SortPriority: 0
 IncludeIsMainRegex: ([-_](test|unittest))?$
 IncludeIsMainSourceRegex: ''
@@ -124,7 +118,7 @@ RawStringFormats:
       - c++
       - C++
     CanonicalDelimiter: ''
-    BasedOnStyle: google
+    # BasedOnStyle: google
   - Language: TextProto
     Delimiters:
       - pb
@@ -142,7 +136,7 @@ RawStringFormats:
       - ParseTestProto
       - ParsePartialTestProto
     CanonicalDelimiter: ''
-    BasedOnStyle: google
+    # BasedOnStyle: google
 ReflowComments: true
 # ShortNamespaceLines: 0 # Not available at the moment.
 SortIncludes: true

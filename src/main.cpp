@@ -3,10 +3,9 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-#include <google/protobuf/stubs/common.h>
-
 #include <cstring> // std::memcpy
 #include <fstream>
+#include <google/protobuf/stubs/common.h>
 #include <iostream>
 #include <limits> // std::numeric_limits
 #include <vector>

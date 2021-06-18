@@ -6,7 +6,6 @@
 #include "parser.hpp"
 
 #include <google/protobuf/arena.h>
-
 #include <ygopen/client/board.hpp>
 #include <ygopen/client/card.hpp>
 #include <ygopen/client/frame.hpp>
