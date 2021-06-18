@@ -13,7 +13,7 @@
 #include <ygopen/client/parse_event.hpp>
 #include <ygopen/client/parse_query.hpp>
 #include <ygopen/client/value_wrappers.hpp>
-#include <ygopen/codec/encode_edo9300_ocgcore.hpp>
+#include <ygopen/codec/edo9300_ocgcore_encode.hpp>
 #include <ygopen/proto/replay.hpp>
 
 namespace
