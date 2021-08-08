@@ -190,7 +190,7 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 			break;
 		// Actual encoding.
 		using namespace YGOpen::Codec;
-		auto r = Edo9300::OCGCore::encode_one(ctx.arena(), buffer);
+		auto r = Edo9300::OCGCore::encode_one(ctx.arena(), ctx, buffer);
 		switch(r.state)
 		{
 		case EncodeOneResult::State::OK:
@@ -198,22 +198,9 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 			ctx.parse(*r.msg);
 			break;
 		}
-		case EncodeOneResult::State::SPECIAL:
-		{
-			r = Edo9300::OCGCore::encode_one_special(ctx.arena(), ctx, buffer);
-			if(r.state == EncodeOneResult::State::OK)
-			{
-				ctx.parse(*r.msg);
-			}
-			else if(r.state != EncodeOneResult::State::SWALLOWED)
-			{
-				std::exit(7U);
-			}
-			break;
-		}
 		case EncodeOneResult::State::SWALLOWED:
 		{
-			// NOTE: Don't care about non-special swallowed messages.
+			// NOTE: Don't care about swallowed messages.
 			break;
 		}
 		default: // EncodeOneResult::State::UNKNOWN
