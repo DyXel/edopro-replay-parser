@@ -67,6 +67,10 @@ struct ReplayHeader
 
 // -----------------------------------------------------------------------------
 
+
+constexpr auto IOS_IN = std::ios_base::binary | std::ios_base::in;
+constexpr auto IOS_OUT = std::ios_base::binary | std::ios_base::out;
+
 } // namespace
 
 auto main(int argc, char* argv[]) -> int
@@ -74,20 +78,20 @@ auto main(int argc, char* argv[]) -> int
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 	if(argc < 2)
 	{
-		std::cerr << "yrp: No input file, yrpX file expected.\n";
+		std::cerr << exe << ": No input file, yrpX file expected.\n";
 		return 1;
 	}
-	std::fstream f(argv[1], std::ios_base::binary | std::ios_base::in);
+	std::fstream f(argv[argc - 1], IOS_IN);
 	if(!f.is_open())
 	{
-		std::cerr << "yrp: Could not open file.\n";
+		std::cerr << exe << ": Could not open file.\n";
 		return 2;
 	}
 	f.ignore(std::numeric_limits<std::streamsize>::max());
 	auto const f_size = static_cast<size_t>(f.gcount());
 	if(f_size < sizeof(ReplayHeader))
 	{
-		std::cerr << "yrp: File too small.\n";
+		std::cerr << exe << ": File too small.\n";
 		return 3;
 	}
 	f.clear();
@@ -96,7 +100,7 @@ auto main(int argc, char* argv[]) -> int
 	f.read(reinterpret_cast<char*>(&header), sizeof(ReplayHeader));
 	if(header.type != REPLAY_YRPX)
 	{
-		std::cerr << "yrp: Not a yrpX file.\n";
+		std::cerr << exe << ": Not a yrpX file.\n";
 		return 4;
 	}
 	auto pth_buf = [&]() -> std::vector<uint8_t>
@@ -109,9 +113,9 @@ auto main(int argc, char* argv[]) -> int
 			return ret;
 		}
 		// Decompress.
-		auto fail = [&ret](std::string_view e) -> std::vector<uint8_t>
+		auto fail = [&](std::string_view e) -> std::vector<uint8_t>
 		{
-			std::cerr << "yrp: Error decompressing replay: " << e << ".\n";
+			std::cerr << exe << ": Error decompressing replay: " << e << ".\n";
 			ret.clear();
 			return ret;
 		};
@@ -192,9 +196,7 @@ auto main(int argc, char* argv[]) -> int
 	}();
 	size_t msg_buffer_size = pth_buf.size() - (ptr_to_msgs - pth_buf.data());
 	auto const replay_bin = analyze(ptr_to_msgs, msg_buffer_size);
-	std::fstream{std::string{argv[1]} + ".pb",
-	             std::ios_base::binary | std::ios_base::out}
-		<< replay_bin;
+	std::fstream{std::string{argv[argc - 1]} + ".pb", IOS_OUT} << replay_bin;
 	google::protobuf::ShutdownProtobufLibrary();
 	return 0;
 }
