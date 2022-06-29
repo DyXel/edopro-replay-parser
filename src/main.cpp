@@ -3,15 +3,15 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
+#include <array>
 #include <cstring> // std::memcpy
 #include <fstream>
 #include <google/protobuf/stubs/common.h>
 #include <iostream>
 #include <limits> // std::numeric_limits
+#include <lzma.h>
 #include <vector>
 
-#include "LZMA/Alloc.h" // g_Alloc
-#include "LZMA/LzmaDec.h"
 #include "parser.hpp"
 
 namespace
@@ -101,27 +101,73 @@ auto main(int argc, char* argv[]) -> int
 	}
 	auto pth_buf = [&]() -> std::vector<uint8_t>
 	{
-		SizeT full_size = f_size - sizeof(ReplayHeader);
+		std::vector<uint8_t> ret(header.size);
 		if((header.flags & REPLAY_COMPRESSED) == 0)
 		{
-			std::vector<uint8_t> full(full_size);
-			f.read(reinterpret_cast<char*>(full.data()), full_size);
-			return full;
+			assert(f_size - sizeof(ReplayHeader) == header.size);
+			f.read(reinterpret_cast<char*>(ret.data()), ret.size());
+			return ret;
 		}
 		// Decompress.
-		std::vector<uint8_t> uncomp(header.size);
-		SizeT dest_len = uncomp.size();
-		ELzmaStatus status;
-		std::vector<uint8_t> comp_buf(full_size);
-		f.read(reinterpret_cast<char*>(comp_buf.data()), full_size);
-		if(LzmaDecode(uncomp.data(), &dest_len, comp_buf.data(), &full_size,
-		              header.props, LZMA_PROPS_SIZE, LZMA_FINISH_ANY, &status,
-		              &g_Alloc) != SZ_OK)
+		auto fail = [&ret](std::string_view e) -> std::vector<uint8_t>
 		{
-			std::cerr << "yrp: Error uncompressing replay.\n";
-			uncomp.clear();
+			std::cerr << "yrp: Error decompressing replay: " << e << ".\n";
+			ret.clear();
+			return ret;
+		};
+		// We trick liblzma into believing that it is decompressing a .lzma
+		// file as opposed to a raw stream from 7zip SDK by passing this crafted
+		// header first to the decode stream. It consists of:
+		//   1 byte   LZMA properties byte that encodes lc/lp/pb
+		//   4 bytes  dictionary size as little endian uint32_t
+		//   8 bytes  uncompressed size as little endian uint64_t
+		// With the first 5 bytes corresponding to the "props" stored in the
+		// replay header.
+		auto const fake_header = [&]()
+		{
+			std::array<uint8_t, 1U + 4U + 8U> ret_header{};
+			std::memcpy(ret_header.data(), header.props, 5U);
+			for(unsigned i = 0U; i <= 3U; ++i)
+				ret_header[i + 5U] = (header.size >> (8U * i)) & 0xFFU;
+			return ret_header;
+		}();
+		lzma_stream stream = LZMA_STREAM_INIT;
+		stream.avail_in = fake_header.size();
+		stream.next_in = fake_header.data();
+		stream.avail_out = header.size;
+		stream.next_out = ret.data();
+		if(lzma_alone_decoder(&stream, UINT64_MAX) != LZMA_OK)
+			return fail("Unable to initialize decode stream");
+		struct End // Close the stream regardless of how we end decompression.
+		{
+			lzma_stream& s;
+			~End() { lzma_end(&s); }
+		} _{stream};
+		while(stream.avail_in != 0)
+			if(lzma_code(&stream, LZMA_RUN) != LZMA_OK)
+				return fail("Cannot decode header");
+		if(stream.total_out != 0)
+			return fail("Unexpected total decompressed size");
+		std::array<uint8_t, 2048U> buffer;
+		stream.next_in = buffer.data();
+		for(;;)
+		{
+			f.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+			stream.avail_in = f.gcount();
+			stream.next_in = buffer.data();
+			auto const step = lzma_code(&stream, LZMA_RUN);
+			if(step == LZMA_STREAM_END || f.eof())
+				break;
+			if(step != LZMA_OK)
+			{
+				if(step == LZMA_DATA_ERROR && stream.total_out == header.size)
+					break; // Ignore error so long the total size matches.
+				return fail("Stream decoding failed");
+			}
 		}
-		return uncomp;
+		if(stream.total_out != header.size)
+			return fail("Total decompressed size mismatch");
+		return ret;
 	}();
 	if(pth_buf.size() == 0U)
 		return 5;
