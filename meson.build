@@ -7,6 +7,7 @@ erp_src = files([
 	'src/decompress.cpp',
 	'src/main.cpp',
 	'src/parser.cpp',
+	'src/print_names.cpp',
 ])
 
 erp_exe = executable('erp', erp_src, dependencies : [lzma_dep, ygopen_dep])

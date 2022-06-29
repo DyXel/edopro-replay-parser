@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 #include <array>
-#include <codecvt>
 #include <cstring> // std::memcpy
 #include <fstream>
 #include <google/protobuf/stubs/common.h>
@@ -14,24 +13,12 @@
 
 #include "decompress.hpp"
 #include "parser.hpp"
+#include "print_names.hpp"
 
 namespace
 {
 
-template<typename T>
-constexpr auto read(uint8_t const*& ptr) -> T
-{
-	T value{};
-	std::memcpy(&value, ptr, sizeof(T));
-	ptr += sizeof(T);
-	return value;
-}
-
-template<typename T>
-constexpr auto read(uint8_t*& ptr) -> T
-{
-	return read<T>(const_cast<uint8_t const*&>(ptr));
-}
+#include "read.inl"
 
 constexpr auto IOS_IN = std::ios_base::binary | std::ios_base::in;
 constexpr auto IOS_OUT = std::ios_base::binary | std::ios_base::out;
@@ -48,6 +35,7 @@ auto main(int argc, char* argv[]) -> int
 		return 1;
 	}
 	std::fstream f(argv[argc - 1], IOS_IN);
+	bool print_names_opt = true;           // argv == "--names"sv
 	if(!f.is_open())
 	{
 		std::cerr << exe << ": Could not open file.\n";
@@ -72,6 +60,8 @@ auto main(int argc, char* argv[]) -> int
 	auto pth_buf = decompress(exe, header, f, header.size);
 	if(pth_buf.size() == 0U)
 		return 5;
+	if(print_names_opt)
+		print_names(header.flags, pth_buf.data());
 	auto ptr_to_msgs = [&]() -> uint8_t*
 	{
 		auto* ptr = pth_buf.data();
