@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Dylam De La Torre <dyxel04@gmail.com>
+ * Copyright (c) 2022, Dylam De La Torre <dyxel04@gmail.com>
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -159,17 +159,16 @@ private:
 
 } // namespace
 
-auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
+auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
+	-> std::string
 {
 	decltype(buffer) const sentry = buffer + size;
 	ReplayContext ctx;
-	for(;;)
+	do
 	{
-		if(sentry == buffer) // Consumed entire buffer.
-			break;
 		if(sentry < buffer + sizeof(uint8_t) + sizeof(uint32_t))
 		{
-			std::cerr << "yrp: Unexpectedly short size for next message.\n";
+			std::cerr << exe << ": Unexpectedly short size for next message.\n";
 			std::exit(6U);
 		}
 		// NOTE: Replays have size and msg_type swapped for some reason, we do
@@ -185,12 +184,12 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 			return {msg, size};
 		}();
 		// We do not parse old replay format message.
-		constexpr uint8_t OLD_REPLAY_FORMAT = 231U;
-		if(msg_type == OLD_REPLAY_FORMAT)
+		if(msg_type == 231U) // NOLINT: OLD_REPLAY_FORMAT
 			break;
 		// Actual encoding.
 		using namespace YGOpen::Codec;
 		auto r = Edo9300::OCGCore::encode_one(ctx.arena(), ctx, buffer);
+		buffer += r.bytes_read;
 		switch(r.state)
 		{
 		case EncodeOneResult::State::OK:
@@ -204,12 +203,15 @@ auto analyze(uint8_t* buffer, size_t size) noexcept -> std::string
 			break;
 		}
 		default: // EncodeOneResult::State::UNKNOWN
-			std::cerr << "yrp: Encountered unknown core message number: ";
+			std::cerr << exe << ": Encountered unknown core message number: ";
 			std::cerr << static_cast<int>(msg_type) << ".\n";
 			std::exit(8U);
 		}
-		assert((msg_size + 1U) == r.bytes_read);
-		buffer += r.bytes_read;
-	}
+		if((msg_size + 1U) != r.bytes_read)
+		{
+			std::cerr << exe << ": Read length for message is mismatched.\n";
+			std::exit(9U);
+		}
+	} while(sentry == buffer);
 	return ctx.serialize();
 }

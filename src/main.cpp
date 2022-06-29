@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Dylam De La Torre <dyxel04@gmail.com>
+ * Copyright (c) 2022, Dylam De La Torre <dyxel04@gmail.com>
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -76,6 +76,7 @@ constexpr auto IOS_OUT = std::ios_base::binary | std::ios_base::out;
 auto main(int argc, char* argv[]) -> int
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
+	auto const exe = std::string_view(argv[0]);
 	if(argc < 2)
 	{
 		std::cerr << exe << ": No input file, yrpX file expected.\n";
@@ -195,7 +196,7 @@ auto main(int argc, char* argv[]) -> int
 		return ptr;
 	}();
 	size_t msg_buffer_size = pth_buf.size() - (ptr_to_msgs - pth_buf.data());
-	auto const replay_bin = analyze(ptr_to_msgs, msg_buffer_size);
+	auto const replay_bin = analyze(exe, ptr_to_msgs, msg_buffer_size);
 	std::fstream{std::string{argv[argc - 1]} + ".pb", IOS_OUT} << replay_bin;
 	google::protobuf::ShutdownProtobufLibrary();
 	return 0;
