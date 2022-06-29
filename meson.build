@@ -4,6 +4,7 @@ lzma_dep = dependency('liblzma')
 ygopen_dep = dependency('ygopen')
 
 erp_src = files([
+	'src/decompress.cpp',
 	'src/main.cpp',
 	'src/parser.cpp',
 ])
