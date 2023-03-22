@@ -12,7 +12,7 @@
 
 #include "replay_data.hpp"
 
-auto decompress(std::string_view exe, ReplayHeader const& header,
+auto decompress(std::string_view exe, ExtendedReplayHeader const& header,
                 std::istream& is, size_t max_size) noexcept
 	-> std::vector<uint8_t>;
 

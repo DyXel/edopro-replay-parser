@@ -50,22 +50,37 @@ auto main(int argc, char* argv[]) -> int
 	}
 	f.clear();
 	f.seekg(0, std::ios_base::beg);
-	ReplayHeader header;
-	f.read(reinterpret_cast<char*>(&header), sizeof(ReplayHeader));
-	if(header.type != REPLAY_YRPX)
+	ExtendedReplayHeader header{};
+	f.read(reinterpret_cast<char*>(&header.base), sizeof(ReplayHeader));
+	if(header.base.type != REPLAY_YRPX)
 	{
 		std::cerr << exe << ": Not a yrpX file.\n";
 		return 4;
 	}
-	auto pth_buf = decompress(exe, header, f, header.size);
+	if(header.base.flags & REPLAY_EXTENDED_HEADER)
+	{
+		if(f_size < sizeof(ExtendedReplayHeader))
+		{
+			std::cerr << exe << ": File too small.\n";
+			return 5;
+		}
+		f.seekg(0, std::ios_base::beg);
+		f.read(reinterpret_cast<char*>(&header), sizeof(ExtendedReplayHeader));
+		if(header.header_version > ExtendedReplayHeader::latest_header_version)
+		{
+			std::cerr << exe << ": Replay version is too new.\n";
+			return 6;
+		}
+	}
+	auto pth_buf = decompress(exe, header, f, header.base.size);
 	if(pth_buf.size() == 0U)
-		return 5;
+		return 7; // NOTE: Error message printed by `decompress`.
 	if(print_names_opt)
-		print_names(header.flags, pth_buf.data());
+		print_names(header.base.flags, pth_buf.data());
 	auto ptr_to_msgs = [&]() -> uint8_t*
 	{
 		auto* ptr = pth_buf.data();
-		if((header.flags & REPLAY_SINGLE_MODE) != 0U)
+		if((header.base.flags & REPLAY_SINGLE_MODE) != 0U)
 		{
 			ptr += 40U * 2U; // Assume only 2 duelists.
 		}
@@ -75,7 +90,7 @@ auto main(int argc, char* argv[]) -> int
 			ptr += read<uint32_t>(ptr) * 40U; // Duelists team 2.
 		}
 		// Duel flags.
-		if((header.flags & REPLAY_64BIT_DUELFLAG) != 0U)
+		if((header.base.flags & REPLAY_64BIT_DUELFLAG) != 0U)
 			read<uint64_t>(ptr);
 		else
 			read<uint32_t>(ptr);

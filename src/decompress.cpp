@@ -10,13 +10,13 @@
 #include <iostream>
 #include <lzma.h>
 
-auto decompress(std::string_view exe, ReplayHeader const& header,
+auto decompress(std::string_view exe, ExtendedReplayHeader const& header,
                 std::istream& is, size_t max_size) noexcept
 	-> std::vector<uint8_t>
 {
 	// Just copy if replay is not compressed.
 	std::vector<uint8_t> ret(max_size);
-	if((header.flags & REPLAY_COMPRESSED) == 0)
+	if((header.base.flags & REPLAY_COMPRESSED) == 0)
 	{
 		is.read(reinterpret_cast<char*>(ret.data()), ret.size());
 		return ret;
@@ -39,9 +39,9 @@ auto decompress(std::string_view exe, ReplayHeader const& header,
 	auto const fake_header = [&]()
 	{
 		std::array<uint8_t, 1U + 4U + 8U> ret_header{};
-		std::memcpy(ret_header.data(), header.props, 5U);
+		std::memcpy(ret_header.data(), header.base.props, 5U);
 		for(unsigned i = 0U; i <= 3U; ++i)
-			ret_header[i + 5U] = (header.size >> (8U * i)) & 0xFFU;
+			ret_header[i + 5U] = (header.base.size >> (8U * i)) & 0xFFU;
 		return ret_header;
 	}();
 	lzma_stream stream = LZMA_STREAM_INIT;
@@ -73,7 +73,7 @@ auto decompress(std::string_view exe, ReplayHeader const& header,
 			break;
 		if(step != LZMA_OK)
 		{
-			if(step == LZMA_DATA_ERROR && stream.total_out == header.size)
+			if(step == LZMA_DATA_ERROR && stream.total_out == header.base.size)
 				break; // Ignore error so long the total size matches.
 			return fail("Stream decoding failed");
 		}
