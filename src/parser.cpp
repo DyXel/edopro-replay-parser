@@ -212,6 +212,6 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 			std::cerr << exe << ": Read length for message is mismatched.\n";
 			std::exit(9U);
 		}
-	} while(sentry == buffer);
+	} while(sentry != buffer);
 	return ctx.serialize();
 }
