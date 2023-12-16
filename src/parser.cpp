@@ -1,11 +1,12 @@
 /*
- * Copyright (c) 2022, Dylam De La Torre <dyxel04@gmail.com>
+ * Copyright (c) 2024, Dylam De La Torre <dyxel04@gmail.com>
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 #include "parser.hpp"
 
 #include <google/protobuf/arena.h>
+#include <map>
 #include <ygopen/client/board.hpp>
 #include <ygopen/client/card.hpp>
 #include <ygopen/client/frame.hpp>
