@@ -26,6 +26,22 @@ namespace
 constexpr auto IOS_IN = std::ios_base::binary | std::ios_base::in;
 constexpr auto IOS_OUT = std::ios_base::binary | std::ios_base::out;
 
+auto print_usage(std::string_view exe) noexcept -> void
+{
+	std::cerr << "usage: " << exe << " [--names]"
+			  << " [--date]"
+			  << " [--duel-options]"
+			  << " [--duel-msgs]"
+			  << " REPLAY\n\n";
+	std::cerr << "  --names\t\tIf passed, print names of all the duelists.\n";
+	std::cerr << "  --date\t\tIf passed, print date of the replay (when the "
+				 "duel started).\n";
+	std::cerr << "  --duel-options\tIf passed, print the duel flags and seed "
+				 "(in hexadecimal).\n";
+	std::cerr << "  --duel-msgs\t\tIf passed, print all the parsed messages.\n";
+	std::cerr << "  REPLAY\t\tReplay file to parse (required).\n";
+}
+
 } // namespace
 
 auto main(int argc, char* argv[]) -> int
@@ -35,23 +51,51 @@ auto main(int argc, char* argv[]) -> int
 	{
 		~_() { google::protobuf::ShutdownProtobufLibrary(); }
 	} on_exit;
-	auto const exe = std::string_view(argv[0]);
-	if(argc < 2)
+	auto const exe = std::string_view{argv[0]};
+	if(argc < 3)
 	{
-		std::cerr << exe << ": No input file, yrpX file expected.\n";
+		std::cerr << exe << ": No input file or flags.\n";
+		print_usage(exe);
 		return 1;
 	}
 	auto const fn = std::string_view{argv[argc - 1]};
 	std::fstream f(fn.data(), IOS_IN);
 	if(!f.is_open())
 	{
-		std::cerr << exe << ": Could not open file " << fn << ".\n";
+		std::cerr << exe << ": Could not open file '" << fn << "'.\n";
 		return 2;
 	}
-	bool print_names_opt = true;         // argv == "--names"sv
-	bool print_date_opt = true;          // argv == "--date"sv
-	bool print_duel_options_opt = true;  // argv == "--duel-options"sv
-	bool print_duel_messages_opt = true; // argv == "--msgs"sv
+	bool print_names_opt = false;
+	bool print_date_opt = false;
+	bool print_duel_options_opt = false;
+	bool print_duel_messages_opt = false;
+	for(int a = 1; a < argc - 1; a++)
+	{
+		auto const arg = std::string_view{argv[a]};
+		if(arg == "--names")
+		{
+			print_names_opt = true;
+			continue;
+		}
+		if(arg == "--date")
+		{
+			print_date_opt = true;
+			continue;
+		}
+		if(arg == "--duel-options")
+		{
+			print_duel_options_opt = true;
+			continue;
+		}
+		if(arg == "--duel-msgs")
+		{
+			print_duel_messages_opt = true;
+			continue;
+		}
+		std::cerr << "Unrecognized option '" << arg << "'.\n";
+		print_usage(exe);
+		return 1;
+	}
 	f.ignore(std::numeric_limits<std::streamsize>::max());
 	auto const f_size = static_cast<size_t>(f.gcount());
 	if(f_size < sizeof(ReplayHeader))
@@ -126,8 +170,12 @@ auto main(int argc, char* argv[]) -> int
 				  << duel_flags << '\n';
 		std::cout << std::dec;
 	}
-	size_t msg_buffer_size = pth_buf.size() - (ptr_to_msgs - pth_buf.data());
-	auto const replay_bin = analyze(exe, ptr_to_msgs, msg_buffer_size);
-	std::fstream{std::string{argv[argc - 1]} + ".pb", IOS_OUT} << replay_bin;
+	if(print_duel_messages_opt)
+	{
+		size_t msg_buffer_size =
+			pth_buf.size() - (ptr_to_msgs - pth_buf.data());
+		auto const replay_bin = analyze(exe, ptr_to_msgs, msg_buffer_size);
+		std::fstream{std::string{fn} + ".pb", IOS_OUT} << replay_bin;
+	}
 	return 0;
 }

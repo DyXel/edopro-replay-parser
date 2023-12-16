@@ -12,6 +12,5 @@
 auto print_date(uint32_t timestamp) noexcept -> void
 {
 	auto const t = std::time_t{timestamp};
-	std::cout << "Date: "
-			  << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S\n");
+	std::cout << std::put_time(std::localtime(&t), "Date: %Y-%m-%d %H:%M:%S\n");
 }
