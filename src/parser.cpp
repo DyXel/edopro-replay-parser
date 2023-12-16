@@ -170,7 +170,7 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 		if(sentry < buffer + sizeof(uint8_t) + sizeof(uint32_t))
 		{
 			std::cerr << exe << ": Unexpectedly short size for next message.\n";
-			std::exit(6U);
+			std::exit(9);
 		}
 		// NOTE: Replays have size and msg_type swapped for some reason, we do
 		// that swap here before trying to encode.
@@ -206,12 +206,12 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 		default: // EncodeOneResult::State::UNKNOWN
 			std::cerr << exe << ": Encountered unknown core message number: ";
 			std::cerr << static_cast<int>(msg_type) << ".\n";
-			std::exit(8U);
+			std::exit(10);
 		}
 		if((msg_size + 1U) != r.bytes_read)
 		{
 			std::cerr << exe << ": Read length for message is mismatched.\n";
-			std::exit(9U);
+			std::exit(11);
 		}
 	} while(sentry != buffer);
 	return ctx.serialize();

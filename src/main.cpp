@@ -94,14 +94,14 @@ auto main(int argc, char* argv[]) -> int
 		}
 		std::cerr << "Unrecognized option '" << arg << "'.\n";
 		print_usage(exe);
-		return 1;
+		return 3;
 	}
 	f.ignore(std::numeric_limits<std::streamsize>::max());
 	auto const f_size = static_cast<size_t>(f.gcount());
 	if(f_size < sizeof(ReplayHeader))
 	{
 		std::cerr << exe << ": File too small.\n";
-		return 3;
+		return 4;
 	}
 	f.clear();
 	f.seekg(0, std::ios_base::beg);
@@ -110,26 +110,26 @@ auto main(int argc, char* argv[]) -> int
 	if(header.base.type != REPLAY_YRPX)
 	{
 		std::cerr << exe << ": Not a yrpX file.\n";
-		return 4;
+		return 5;
 	}
 	if(header.base.flags & REPLAY_EXTENDED_HEADER)
 	{
 		if(f_size < sizeof(ExtendedReplayHeader))
 		{
 			std::cerr << exe << ": File too small.\n";
-			return 5;
+			return 6;
 		}
 		f.seekg(0, std::ios_base::beg);
 		f.read(reinterpret_cast<char*>(&header), sizeof(ExtendedReplayHeader));
 		if(header.header_version > ExtendedReplayHeader::latest_header_version)
 		{
 			std::cerr << exe << ": Replay version is too new.\n";
-			return 6;
+			return 7;
 		}
 	}
 	auto pth_buf = decompress(exe, header, f, header.base.size);
 	if(pth_buf.size() == 0U)
-		return 7; // NOTE: Error message printed by `decompress`.
+		return 8; // NOTE: Error message printed by `decompress`.
 	if(print_names_opt)
 		print_names(header.base.flags, pth_buf.data());
 	if(print_date_opt)
