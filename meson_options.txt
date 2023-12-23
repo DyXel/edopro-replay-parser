@@ -1,0 +1,7 @@
+option('pb_optimize_for',
+	type : 'combo',
+	choices : ['speed', 'code_size'],
+	value : 'speed',
+	description : 'Yielded by "ygopen" depedency to choose the full ' +
+	              'protobuf implementation'
+)

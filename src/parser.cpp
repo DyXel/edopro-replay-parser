@@ -6,6 +6,7 @@
 #include "parser.hpp"
 
 #include <google/protobuf/arena.h>
+#include <google/protobuf/util/json_util.h>
 #include <map>
 #include <ygopen/client/board.hpp>
 #include <ygopen/client/card.hpp>
@@ -139,7 +140,12 @@ public:
 
 	auto serialize() noexcept -> std::string
 	{
-		return replay_.SerializeAsString();
+		std::string out;
+		auto options = google::protobuf::json::PrintOptions{};
+		options.always_print_primitive_fields = true;
+		options.always_print_enums_as_ints = true;
+		(void) google::protobuf::json::MessageToJsonString(replay_, &out, options);
+		return out;
 	}
 
 private:

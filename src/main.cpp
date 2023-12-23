@@ -172,10 +172,8 @@ auto main(int argc, char* argv[]) -> int
 	}
 	if(print_duel_messages_opt)
 	{
-		size_t msg_buffer_size =
-			pth_buf.size() - (ptr_to_msgs - pth_buf.data());
-		auto const replay_bin = analyze(exe, ptr_to_msgs, msg_buffer_size);
-		std::fstream{std::string{fn} + ".pb", IOS_OUT} << replay_bin;
+		size_t buffer_size = pth_buf.size() - (ptr_to_msgs - pth_buf.data());
+		std::cout << analyze(exe, ptr_to_msgs, buffer_size) << '\n';
 	}
 	return 0;
 }
