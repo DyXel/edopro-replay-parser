@@ -144,7 +144,8 @@ public:
 		auto options = google::protobuf::json::PrintOptions{};
 		options.always_print_primitive_fields = true;
 		options.always_print_enums_as_ints = true;
-		(void) google::protobuf::json::MessageToJsonString(replay_, &out, options);
+		(void)google::protobuf::json::MessageToJsonString(replay_, &out,
+		                                                  options);
 		return out;
 	}
 
@@ -167,16 +168,18 @@ private:
 } // namespace
 
 auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
-	-> std::string
+	-> AnalyzeResult
 {
 	decltype(buffer) const sentry = buffer + size;
+	uint8_t* orm_buffer;
+	size_t orm_size;
 	ReplayContext ctx;
 	do
 	{
 		if(sentry < buffer + sizeof(uint8_t) + sizeof(uint32_t))
 		{
 			std::cerr << exe << ": Unexpectedly short size for next message.\n";
-			std::exit(9);
+			return {false, {}, {}, {}};
 		}
 		// NOTE: Replays have size and msg_type swapped for some reason, we do
 		// that swap here before trying to encode.
@@ -188,11 +191,15 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 			std::memcpy(&size, buffer + sizeof(msg), sizeof(size));
 			buffer += sizeof(size);
 			std::memcpy(buffer, &msg, sizeof(msg));
+			// NOTE: Don't eat the type as `encode_one` needs it.
 			return {msg, size};
 		}();
-		// We do not parse old replay format message.
 		if(msg_type == 231U) // NOLINT: OLD_REPLAY_FORMAT
+		{
+			orm_buffer = buffer + 1U; // Eat msg_type to align with header.
+			orm_size = size;
 			break;
+		}
 		// Actual encoding.
 		using namespace YGOpen::Codec;
 		auto r = Edo9300::OCGCore::encode_one(ctx.arena(), ctx, buffer);
@@ -212,13 +219,13 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 		default: // EncodeOneResult::State::UNKNOWN
 			std::cerr << exe << ": Encountered unknown core message number: ";
 			std::cerr << static_cast<int>(msg_type) << ".\n";
-			std::exit(10);
+			return {false, {}, {}, {}};
 		}
 		if((msg_size + 1U) != r.bytes_read)
 		{
 			std::cerr << exe << ": Read length for message is mismatched.\n";
-			std::exit(11);
+			return {false, {}, {}, {}};
 		}
 	} while(sentry != buffer);
-	return ctx.serialize();
+	return {true, ctx.serialize(), orm_buffer, orm_size};
 }

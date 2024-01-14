@@ -9,7 +9,15 @@
 #include <string>
 #include <string_view>
 
+struct AnalyzeResult
+{
+	bool success;
+	std::string duel_messages;
+	uint8_t* old_replay_mode_buffer;
+	size_t old_replay_mode_size;
+};
+
 auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
-	-> std::string;
+	-> AnalyzeResult;
 
 #endif // ERP_PARSER_HPP
