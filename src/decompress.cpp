@@ -22,7 +22,7 @@ auto decompress(std::string_view exe, ExtendedReplayHeader const& header,
 		return ret;
 	}
 	// Actually decompress data in LZMA1 format.
-	auto fail = [&](std::string_view e) -> std::vector<uint8_t>
+	auto fail = [&](std::string_view e) -> std::vector<uint8_t>&
 	{
 		std::cerr << exe << ": Error decompressing replay: " << e << ".\n";
 		ret.clear();
