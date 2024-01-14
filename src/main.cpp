@@ -33,7 +33,7 @@ auto print_usage(std::string_view exe) noexcept -> void
 			  << " [--date]"
 			  << " [--decks]"
 			  << " [--duel-seed]"
-			  << " [--duel-flags]"
+			  << " [--duel-options]"
 			  << "\n       " << std::string(exe.length(), ' ')
 			  << " [--duel-msgs]"
 			  << " [--duel-responses]"
@@ -45,7 +45,7 @@ auto print_usage(std::string_view exe) noexcept -> void
 				 "names).\n";
 	std::cerr << "  --duel-seed\t\tPrint the duel seed "
 				 "(in hexadecimal).\n";
-	std::cerr << "  --duel-flags\t\tPrint the duel flags "
+	std::cerr << "  --duel-options\tPrint the duel flags "
 				 "(in hexadecimal).\n";
 	std::cerr << "  --duel-msgs\t\tPrint all the parsed messages.\n";
 	std::cerr << "  --duel-resps\t\tPrint all responses.\n";
@@ -82,6 +82,19 @@ auto read_header(std::string_view exe, uint8_t const* buffer_data,
 	return r;
 }
 
+constexpr auto skip_duelists(uint32_t flags, uint8_t*& ptr) noexcept -> void
+{
+	if((flags & REPLAY_SINGLE_MODE) != 0U)
+	{
+		ptr += 40U * 2U; // Assume only 2 duelists.
+	}
+	else
+	{
+		ptr += read<uint32_t>(ptr) * 40U; // Duelists team 1.
+		ptr += read<uint32_t>(ptr) * 40U; // Duelists team 2.
+	}
+}
+
 } // namespace
 
 auto main(int argc, char* argv[]) -> int
@@ -109,7 +122,7 @@ auto main(int argc, char* argv[]) -> int
 	bool print_date_opt = false;
 	bool print_decks_opt = false;
 	bool print_duel_seed_opt = false;
-	bool print_duel_flags_opt = false;
+	bool print_duel_options_opt = false;
 	bool print_duel_msgs_opt = false;
 	bool print_duel_resps_opt = false;
 	for(int a = 1; a < argc - 1; a++)
@@ -135,9 +148,9 @@ auto main(int argc, char* argv[]) -> int
 			print_duel_seed_opt = true;
 			continue;
 		}
-		if(arg == "--duel-flags")
+		if(arg == "--duel-options")
 		{
-			print_duel_flags_opt = true;
+			print_duel_options_opt = true;
 			continue;
 		}
 		if(arg == "--duel-msgs")
@@ -182,22 +195,14 @@ auto main(int argc, char* argv[]) -> int
 		print_names(yrpx_header.base.flags, pth_buf.data());
 	if(print_date_opt)
 		print_date(yrpx_header.base.seed);
-	if(!print_duel_seed_opt && !print_duel_flags_opt && !print_duel_msgs_opt &&
-	   !print_duel_resps_opt)
+	if(!print_duel_seed_opt && !print_duel_options_opt &&
+	   !print_duel_msgs_opt && !print_duel_resps_opt)
 		return EXIT_SUCCESS;
 	uint64_t duel_flags{};
 	auto ptr_to_msgs = [&]() -> uint8_t*
 	{
 		auto* ptr = pth_buf.data();
-		if((yrpx_header.base.flags & REPLAY_SINGLE_MODE) != 0U)
-		{
-			ptr += 40U * 2U; // Assume only 2 duelists.
-		}
-		else
-		{
-			ptr += read<uint32_t>(ptr) * 40U; // Duelists team 1.
-			ptr += read<uint32_t>(ptr) * 40U; // Duelists team 2.
-		}
+		skip_duelists(yrpx_header.base.flags, ptr);
 		// Duel flags.
 		if((yrpx_header.base.flags & REPLAY_64BIT_DUELFLAG) != 0U)
 			duel_flags = read<uint64_t>(ptr);
@@ -214,7 +219,7 @@ auto main(int argc, char* argv[]) -> int
 			return EXIT_FAILURE; // NOTE: Error printed by `analyze`.
 	}
 	std::optional<ExtendedReplayHeader> yrp_header;
-	if(print_duel_seed_opt || print_duel_resps_opt)
+	if(print_decks_opt || print_duel_seed_opt || print_duel_resps_opt)
 	{
 		assert(analysis.has_value());
 		auto [read_yrp_success, header] =
@@ -222,6 +227,11 @@ auto main(int argc, char* argv[]) -> int
 		if(!read_yrp_success)
 			return EXIT_FAILURE; // NOTE: Error printed by `read_header`.
 		yrp_header = header;
+	}
+	if(print_decks_opt)
+	{
+		assert(yrp_header.has_value());
+		// TODO
 	}
 	if(print_duel_seed_opt)
 	{
@@ -234,17 +244,28 @@ auto main(int argc, char* argv[]) -> int
 				  << std::setw(16) << std::setfill('0') << s[3] << '\n';
 		std::cout << std::dec;
 	}
-	if(print_duel_flags_opt)
+	if(print_duel_options_opt)
 	{
-		std::cout << std::hex;
-		std::cout << "Duel flags: 0x" << std::setw(16) << std::setfill('0')
+		assert(yrp_header.has_value());
+		auto* ptr_to_opts =
+			analysis->old_replay_mode_buffer + sizeof(ExtendedReplayHeader);
+		skip_duelists(yrpx_header.base.flags, ptr_to_opts);
+		auto const starting_lp = read<uint32_t>(ptr_to_opts);
+		auto const starting_draw_count = read<uint32_t>(ptr_to_opts);
+		auto const draw_count_per_turn = read<uint32_t>(ptr_to_opts);
+		std::cout << "Duel options: " << starting_lp << ' '
+				  << starting_draw_count << ' ' << draw_count_per_turn << ' '
 				  << duel_flags << '\n';
-		std::cout << std::dec;
 	}
 	if(print_duel_msgs_opt)
 	{
 		assert(analysis.has_value());
 		std::cout << analysis->duel_messages << '\n';
+	}
+	if(print_duel_resps_opt)
+	{
+		assert(yrp_header.has_value());
+		// TODO
 	}
 	return EXIT_SUCCESS;
 }
