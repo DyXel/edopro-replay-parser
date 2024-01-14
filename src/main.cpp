@@ -82,17 +82,32 @@ auto read_header(std::string_view exe, uint8_t const* buffer_data,
 	return r;
 }
 
-constexpr auto skip_duelists(uint32_t flags, uint8_t*& ptr) noexcept -> void
+constexpr auto skip_duelists(uint32_t flags, uint8_t*& ptr) noexcept -> unsigned
 {
+	unsigned num_duelists = 0;
 	if((flags & REPLAY_SINGLE_MODE) != 0U)
 	{
-		ptr += 40U * 2U; // Assume only 2 duelists.
+		num_duelists += 2;
+		ptr += 40U * num_duelists;
 	}
 	else
 	{
-		ptr += read<uint32_t>(ptr) * 40U; // Duelists team 1.
-		ptr += read<uint32_t>(ptr) * 40U; // Duelists team 2.
+		num_duelists += read<uint32_t>(ptr);
+		ptr += 40U * num_duelists; // Duelists team 1.
+		auto const t2c = read<uint32_t>(ptr);
+		num_duelists += t2c;
+		ptr += 40U * t2c; // Duelists team 2.
 	}
+	return num_duelists;
+}
+
+constexpr auto read_duel_flags(uint32_t flags, uint8_t*& ptr) noexcept
+	-> uint64_t
+{
+	if((flags & REPLAY_64BIT_DUELFLAG) != 0U)
+		return read<uint64_t>(ptr);
+	else
+		return static_cast<uint64_t>(read<uint32_t>(ptr));
 }
 
 } // namespace
@@ -203,11 +218,7 @@ auto main(int argc, char* argv[]) -> int
 	{
 		auto* ptr = pth_buf.data();
 		skip_duelists(yrpx_header.base.flags, ptr);
-		// Duel flags.
-		if((yrpx_header.base.flags & REPLAY_64BIT_DUELFLAG) != 0U)
-			duel_flags = read<uint64_t>(ptr);
-		else
-			duel_flags = static_cast<uint64_t>(read<uint32_t>(ptr));
+		duel_flags = read_duel_flags(yrpx_header.base.flags, ptr);
 		return ptr;
 	}();
 	std::optional<AnalyzeResult> analysis;
@@ -231,7 +242,48 @@ auto main(int argc, char* argv[]) -> int
 	if(print_decks_opt)
 	{
 		assert(yrp_header.has_value());
-		// TODO
+		auto* ptr_to_decks = analysis->old_replay_mode_buffer;
+		ptr_to_decks += (yrp_header->base.flags & REPLAY_EXTENDED_HEADER) != 0
+		                    ? sizeof(ExtendedReplayHeader)
+		                    : sizeof(ReplayHeader);
+		auto const num_duelists =
+			skip_duelists(yrp_header->base.flags, ptr_to_decks);
+		ptr_to_decks += sizeof(uint32_t) * 3; // starting_lp, etc...
+		auto duel_flags_yrp =
+			read_duel_flags(yrp_header->base.flags, ptr_to_decks);
+		assert(duel_flags == duel_flags_yrp);
+		using CodeVector = std::vector<uint32_t>;
+		auto read_code_vector = [&ptr_to_decks](CodeVector& cv) noexcept
+		{
+			auto const size = read<uint32_t>(ptr_to_decks);
+			for(unsigned i = 0; i < size; i++)
+				cv.emplace_back(read<uint32_t>(ptr_to_decks));
+		};
+		std::vector<std::pair<CodeVector, CodeVector>> decks;
+		CodeVector extra_cards;
+		decks.reserve(num_duelists);
+		for(auto i = num_duelists; i != 0; i--)
+		{
+			auto& d = decks.emplace_back();
+			read_code_vector(d.first);  // Main deck
+			read_code_vector(d.second); // Extra deck
+		}
+		read_code_vector(extra_cards);
+		// Print decks + extra cards
+		for(auto const& deck_pair : decks)
+		{
+			std::cout << "#main";
+			for(auto code : deck_pair.first)
+				std::cout << ' ' << code;
+			std::cout << " #extra";
+			for(auto code : deck_pair.second)
+				std::cout << ' ' << code;
+			std::cout << '\n';
+		}
+		std::cout << "#rules";
+		for(auto code : extra_cards)
+			std::cout << ' ' << code;
+		std::cout << '\n';
 	}
 	if(print_duel_seed_opt)
 	{
@@ -249,7 +301,7 @@ auto main(int argc, char* argv[]) -> int
 		assert(yrp_header.has_value());
 		auto* ptr_to_opts =
 			analysis->old_replay_mode_buffer + sizeof(ExtendedReplayHeader);
-		skip_duelists(yrpx_header.base.flags, ptr_to_opts);
+		skip_duelists(yrp_header->base.flags, ptr_to_opts);
 		auto const starting_lp = read<uint32_t>(ptr_to_opts);
 		auto const starting_draw_count = read<uint32_t>(ptr_to_opts);
 		auto const draw_count_per_turn = read<uint32_t>(ptr_to_opts);
