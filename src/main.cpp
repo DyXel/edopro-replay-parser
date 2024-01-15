@@ -110,6 +110,17 @@ constexpr auto read_duel_flags(uint32_t flags, uint8_t*& ptr) noexcept
 		return static_cast<uint64_t>(read<uint32_t>(ptr));
 }
 
+constexpr auto read_until_decks(uint32_t flags, uint8_t*& ptr) noexcept
+	-> unsigned
+{
+	ptr += (flags & REPLAY_EXTENDED_HEADER) != 0 ? sizeof(ExtendedReplayHeader)
+	                                             : sizeof(ReplayHeader);
+	auto const num_duelists = skip_duelists(flags, ptr);
+	ptr += sizeof(uint32_t) * 3; // starting_lp, etc...
+	read_duel_flags(flags, ptr);
+	return num_duelists;
+}
+
 } // namespace
 
 auto main(int argc, char* argv[]) -> int
@@ -243,15 +254,8 @@ auto main(int argc, char* argv[]) -> int
 	{
 		assert(yrp_header.has_value());
 		auto* ptr_to_decks = analysis->old_replay_mode_buffer;
-		ptr_to_decks += (yrp_header->base.flags & REPLAY_EXTENDED_HEADER) != 0
-		                    ? sizeof(ExtendedReplayHeader)
-		                    : sizeof(ReplayHeader);
 		auto const num_duelists =
-			skip_duelists(yrp_header->base.flags, ptr_to_decks);
-		ptr_to_decks += sizeof(uint32_t) * 3; // starting_lp, etc...
-		auto duel_flags_yrp =
-			read_duel_flags(yrp_header->base.flags, ptr_to_decks);
-		assert(duel_flags == duel_flags_yrp);
+			read_until_decks(yrp_header->base.flags, ptr_to_decks);
 		using CodeVector = std::vector<uint32_t>;
 		auto read_code_vector = [&ptr_to_decks](CodeVector& cv) noexcept
 		{
@@ -317,7 +321,46 @@ auto main(int argc, char* argv[]) -> int
 	if(print_duel_resps_opt)
 	{
 		assert(yrp_header.has_value());
-		// TODO
+		auto* ptr_to_resps = analysis->old_replay_mode_buffer;
+		auto const num_duelists =
+			read_until_decks(yrp_header->base.flags, ptr_to_resps);
+		for(auto i = num_duelists; i != 0; i--)
+		{
+			ptr_to_resps += read<uint32_t>(ptr_to_resps) * sizeof(uint32_t);
+			ptr_to_resps += read<uint32_t>(ptr_to_resps) * sizeof(uint32_t);
+		}
+		ptr_to_resps += read<uint32_t>(ptr_to_resps) * sizeof(uint32_t);
+		// Read responses
+		using Response = std::vector<uint8_t>;
+		std::vector<Response> resps;
+		decltype(ptr_to_resps) const sentry =
+			analysis->old_replay_mode_buffer + analysis->old_replay_mode_size;
+		do
+		{
+			assert(ptr_to_resps < sentry);
+			auto const size = size_t{read<uint8_t>(ptr_to_resps)};
+			assert(size != 0);
+			auto& resp = resps.emplace_back(size, 0);
+			assert(resp.data() != nullptr);
+			std::memcpy(resp.data(), ptr_to_resps, size);
+			ptr_to_resps += size;
+		} while(sentry != ptr_to_resps);
+		// Print responses
+		std::cout << "{\"responses\":[";
+		auto* pad1 = "";
+		for(auto const& resp : resps)
+		{
+			std::cout << pad1 << "[";
+			pad1 = ",";
+			auto* pad2 = "";
+			for(auto const byte : resp)
+			{
+				std::cout << pad2 << uint32_t{byte};
+				pad2 = ",";
+			}
+			std::cout << "]";
+		}
+		std::cout << "]}\n";
 	}
 	return EXIT_SUCCESS;
 }

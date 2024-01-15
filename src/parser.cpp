@@ -171,8 +171,8 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 	-> AnalyzeResult
 {
 	decltype(buffer) const sentry = buffer + size;
-	uint8_t* orm_buffer;
-	size_t orm_size;
+	uint8_t* orm_buffer = nullptr;
+	size_t orm_size = 0;
 	ReplayContext ctx;
 	do
 	{
@@ -197,7 +197,7 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 		if(msg_type == 231U) // NOLINT: OLD_REPLAY_FORMAT
 		{
 			orm_buffer = buffer + 1U; // Eat msg_type to align with header.
-			orm_size = size;
+			orm_size = msg_size;
 			break;
 		}
 		// Actual encoding.
@@ -227,5 +227,7 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 			return {false, {}, {}, {}};
 		}
 	} while(sentry != buffer);
+	assert(orm_buffer != nullptr);
+	assert(orm_size != 0);
 	return {true, ctx.serialize(), orm_buffer, orm_size};
 }
