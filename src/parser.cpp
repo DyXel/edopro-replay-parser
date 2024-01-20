@@ -141,10 +141,10 @@ public:
 	auto serialize() noexcept -> std::string
 	{
 		std::string out;
-		auto options = google::protobuf::json::PrintOptions{};
+		auto options = google::protobuf::util::JsonPrintOptions{};
 		options.always_print_primitive_fields = true;
 		options.always_print_enums_as_ints = true;
-		(void)google::protobuf::json::MessageToJsonString(replay_, &out,
+		(void)google::protobuf::util::MessageToJsonString(replay_, &out,
 		                                                  options);
 		return out;
 	}
