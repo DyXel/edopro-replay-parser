@@ -247,6 +247,8 @@ auto main(int argc, char* argv[]) -> int
 	if(needs_yrp)
 	{
 		assert(analysis.has_value());
+		if(analysis->old_replay_mode_buffer == nullptr)
+			std::cerr << exe << ": Replay doesn't have OLD_REPLAY_MODE.\n";
 		auto [read_yrp_success, header] =
 			read_header(exe, analysis->old_replay_mode_buffer, REPLAY_YRP1);
 		if(!read_yrp_success)
