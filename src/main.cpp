@@ -210,6 +210,11 @@ auto main(int argc, char* argv[]) -> int
 	}();
 	if(!read_yrpx_success)
 		return EXIT_FAILURE; // NOTE: Error printed by `read_header`.
+	if((yrpx_header.base.flags & REPLAY_HAND_TEST) != 0)
+	{
+		std::cerr << exe << ": Replay is from hand test mode\n";
+		return EXIT_FAILURE;
+	}
 	f.seekg((yrpx_header.base.flags & REPLAY_EXTENDED_HEADER) != 0
 	            ? sizeof(ExtendedReplayHeader)
 	            : sizeof(ReplayHeader),
@@ -236,6 +241,14 @@ auto main(int argc, char* argv[]) -> int
 	bool const needs_yrp = print_decks_opt || print_duel_seed_opt ||
 	                       print_duel_options_opt || print_duel_resps_opt;
 	bool const needs_analysis = print_duel_msgs_opt || needs_yrp;
+	if(auto core_version_major = (yrpx_header.base.version >> 16) & 0xff;
+	   (needs_analysis || needs_yrp) && core_version_major < 10)
+	{
+		// with core version 10, the query for card race was changed from 32 bit
+		// to 64 bit, breaking any message using it, drop such replays for now
+		std::cerr << exe << ": Version of core used in this replay is too old.\n";
+		return EXIT_FAILURE;
+	}
 	if(needs_analysis)
 	{
 		size_t buffer_size = pth_buf.size() - (ptr_to_msgs - pth_buf.data());
