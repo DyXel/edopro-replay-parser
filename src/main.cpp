@@ -221,7 +221,7 @@ auto main(int argc, char* argv[]) -> int
 		print_names(yrpx_header.base.flags, pth_buf.data());
 	if(print_date_opt)
 		print_date(yrpx_header.base.seed);
-	if(!print_duel_seed_opt && !print_duel_options_opt &&
+	if(!print_decks_opt && !print_duel_seed_opt && !print_duel_options_opt &&
 	   !print_duel_msgs_opt && !print_duel_resps_opt)
 		return EXIT_SUCCESS;
 	uint64_t duel_flags{};
