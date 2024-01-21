@@ -233,7 +233,10 @@ auto main(int argc, char* argv[]) -> int
 		return ptr;
 	}();
 	std::optional<AnalyzeResult> analysis;
-	if(print_duel_seed_opt || print_duel_msgs_opt || print_duel_resps_opt)
+	bool const needs_yrp = print_decks_opt || print_duel_seed_opt ||
+	                       print_duel_options_opt || print_duel_resps_opt;
+	bool const needs_analysis = print_duel_msgs_opt || needs_yrp;
+	if(needs_analysis)
 	{
 		size_t buffer_size = pth_buf.size() - (ptr_to_msgs - pth_buf.data());
 		analysis = analyze(exe, ptr_to_msgs, buffer_size);
@@ -241,8 +244,7 @@ auto main(int argc, char* argv[]) -> int
 			return EXIT_FAILURE; // NOTE: Error printed by `analyze`.
 	}
 	std::optional<ExtendedReplayHeader> yrp_header;
-	if(print_decks_opt || print_duel_seed_opt || print_duel_options_opt ||
-	   print_duel_resps_opt)
+	if(needs_yrp)
 	{
 		assert(analysis.has_value());
 		auto [read_yrp_success, header] =
