@@ -241,7 +241,8 @@ auto main(int argc, char* argv[]) -> int
 			return EXIT_FAILURE; // NOTE: Error printed by `analyze`.
 	}
 	std::optional<ExtendedReplayHeader> yrp_header;
-	if(print_decks_opt || print_duel_seed_opt || print_duel_resps_opt)
+	if(print_decks_opt || print_duel_seed_opt || print_duel_options_opt ||
+	   print_duel_resps_opt)
 	{
 		assert(analysis.has_value());
 		auto [read_yrp_success, header] =
