@@ -81,6 +81,37 @@ auto read_header(std::string_view exe, uint8_t const* buffer_data,
 	r.success = true;
 	return r;
 }
+auto read_replay_contents(std::string_view exe,
+                          ExtendedReplayHeader const& header, std::istream& f,
+                          size_t filesize) noexcept -> std::vector<uint8_t>
+{
+	auto header_size = (header.base.flags & REPLAY_EXTENDED_HEADER) != 0
+	                       ? sizeof(ExtendedReplayHeader)
+	                       : sizeof(ReplayHeader);
+	f.seekg(0, std::ios_base::beg);
+	f.ignore(header_size);
+	const auto filesize_without_header = filesize - header_size;
+	std::vector<uint8_t> pth_buf(filesize);
+	f.read(reinterpret_cast<char*>(pth_buf.data()), filesize_without_header);
+	if(static_cast<size_t>(f.gcount()) != filesize_without_header)
+	{
+		std::cerr << exe << ": Read error\n";
+		return {};
+	}
+	if(header.base.flags & REPLAY_COMPRESSED)
+	{
+		pth_buf = decompress(exe, header, pth_buf.data(), pth_buf.size(),
+		                     header.base.size);
+		if(pth_buf.size() == 0U)
+			return {}; // NOTE: Error printed by `decompress`.
+	}
+	else if(header.base.size != filesize)
+	{
+		std::cerr << exe << ": File size doesn't match header\n";
+		return {};
+	}
+	return pth_buf;
+}
 
 constexpr auto skip_duelists(uint32_t flags, uint8_t*& ptr) noexcept -> unsigned
 {
@@ -113,8 +144,6 @@ constexpr auto read_duel_flags(uint32_t flags, uint8_t*& ptr) noexcept
 constexpr auto read_until_decks(uint32_t flags, uint8_t*& ptr) noexcept
 	-> unsigned
 {
-	ptr += (flags & REPLAY_EXTENDED_HEADER) != 0 ? sizeof(ExtendedReplayHeader)
-	                                             : sizeof(ReplayHeader);
 	auto const num_duelists = skip_duelists(flags, ptr);
 	ptr += sizeof(uint32_t) * 3; // starting_lp, etc...
 	read_duel_flags(flags, ptr);
@@ -194,7 +223,8 @@ auto main(int argc, char* argv[]) -> int
 		return EXIT_FAILURE;
 	}
 	f.ignore(std::numeric_limits<std::streamsize>::max());
-	if(static_cast<size_t>(f.gcount()) < sizeof(ExtendedReplayHeader))
+	const auto filesize = static_cast<size_t>(f.gcount());
+	if(filesize < sizeof(ExtendedReplayHeader))
 	{
 		std::cerr << exe << ": File too small.\n";
 		return EXIT_FAILURE;
@@ -202,7 +232,7 @@ auto main(int argc, char* argv[]) -> int
 	f.clear();
 	auto [read_yrpx_success, yrpx_header] = [&]() -> ReadHeaderResult
 	{
-		std::vector<uint8_t> header_buffer(sizeof(ExtendedReplayHeader));
+		std::array<uint8_t, sizeof(ExtendedReplayHeader)> header_buffer{};
 		f.seekg(0, std::ios_base::beg);
 		f.read(reinterpret_cast<char*>(header_buffer.data()),
 		       sizeof(ExtendedReplayHeader));
@@ -215,13 +245,9 @@ auto main(int argc, char* argv[]) -> int
 		std::cerr << exe << ": Replay is from hand test mode\n";
 		return EXIT_FAILURE;
 	}
-	f.seekg((yrpx_header.base.flags & REPLAY_EXTENDED_HEADER) != 0
-	            ? sizeof(ExtendedReplayHeader)
-	            : sizeof(ReplayHeader),
-	        std::ios_base::beg);
-	auto pth_buf = decompress(exe, yrpx_header, f, yrpx_header.base.size);
-	if(pth_buf.size() == 0U)
-		return EXIT_FAILURE; // NOTE: Error printed by `decompress`.
+	auto pth_buf = read_replay_contents(exe, yrpx_header, f, filesize);
+	if(pth_buf.empty())
+		return EXIT_FAILURE;
 	if(print_names_opt)
 		print_names(yrpx_header.base.flags, pth_buf.data());
 	if(print_date_opt)
@@ -257,16 +283,43 @@ auto main(int argc, char* argv[]) -> int
 			return EXIT_FAILURE; // NOTE: Error printed by `analyze`.
 	}
 	std::optional<ExtendedReplayHeader> yrp_header;
+	std::optional<std::vector<uint8_t>> decompressed_yrp_buffer;
 	if(needs_yrp)
 	{
 		assert(analysis.has_value());
 		if(analysis->old_replay_mode_buffer == nullptr)
+		{
 			std::cerr << exe << ": Replay doesn't have OLD_REPLAY_MODE.\n";
+			return EXIT_FAILURE;
+		}
+		if(analysis->old_replay_mode_size < sizeof(ExtendedReplayHeader))
+		{
+			std::cerr << exe << ": Yrp buffer too small.\n";
+			return EXIT_FAILURE;
+		}
 		auto [read_yrp_success, header] =
 			read_header(exe, analysis->old_replay_mode_buffer, REPLAY_YRP1);
 		if(!read_yrp_success)
 			return EXIT_FAILURE; // NOTE: Error printed by `read_header`.
 		yrp_header = header;
+		auto header_size = (header.base.flags & REPLAY_EXTENDED_HEADER) != 0
+		               ? sizeof(ExtendedReplayHeader)
+		               : sizeof(ReplayHeader);
+		analysis->old_replay_mode_buffer += header_size;
+		analysis->old_replay_mode_size -= header_size;
+		if((header.base.flags & REPLAY_COMPRESSED) != 0)
+		{
+			decompressed_yrp_buffer =
+				decompress(exe, header, analysis->old_replay_mode_buffer,
+			               analysis->old_replay_mode_size, header.base.size);
+			analysis->old_replay_mode_buffer = decompressed_yrp_buffer->data();
+			analysis->old_replay_mode_size = decompressed_yrp_buffer->size();
+		}
+		else if(analysis->old_replay_mode_size != header.base.size)
+		{
+			std::cerr << exe << ": Yrp buffer size doesn't match header\n";
+			return EXIT_FAILURE;
+		}
 	}
 	if(print_decks_opt)
 	{
@@ -321,8 +374,7 @@ auto main(int argc, char* argv[]) -> int
 	if(print_duel_options_opt)
 	{
 		assert(yrp_header.has_value());
-		auto* ptr_to_opts =
-			analysis->old_replay_mode_buffer + sizeof(ExtendedReplayHeader);
+		auto* ptr_to_opts = analysis->old_replay_mode_buffer;
 		skip_duelists(yrp_header->base.flags, ptr_to_opts);
 		auto const starting_lp = read<uint32_t>(ptr_to_opts);
 		auto const starting_draw_count = read<uint32_t>(ptr_to_opts);

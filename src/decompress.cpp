@@ -11,17 +11,12 @@
 #include <lzma.h>
 
 auto decompress(std::string_view exe, ExtendedReplayHeader const& header,
-                std::istream& is, size_t max_size) noexcept
+                uint8_t* const& replay_buffer, size_t replay_buffer_size,
+                size_t max_size) noexcept
 	-> std::vector<uint8_t>
 {
-	// Just copy if replay is not compressed.
 	std::vector<uint8_t> ret(max_size);
-	if((header.base.flags & REPLAY_COMPRESSED) == 0)
-	{
-		is.read(reinterpret_cast<char*>(ret.data()), ret.size());
-		return ret;
-	}
-	// Actually decompress data in LZMA1 format.
+	// Decompress data in LZMA1 format.
 	auto fail = [&](std::string_view e) -> std::vector<uint8_t>&
 	{
 		std::cerr << exe << ": Error decompressing replay: " << e << ".\n";
@@ -61,15 +56,12 @@ auto decompress(std::string_view exe, ExtendedReplayHeader const& header,
 			return fail("Cannot decode header");
 	if(stream.total_out != 0)
 		return fail("Unexpected total decompressed size");
-	std::array<uint8_t, 2048U> buffer;
-	stream.next_in = buffer.data();
-	for(;;)
+	stream.avail_in = replay_buffer_size;
+	stream.next_in = replay_buffer;
+	while(stream.avail_in != 0)
 	{
-		is.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-		stream.avail_in = is.gcount();
-		stream.next_in = buffer.data();
 		auto const step = lzma_code(&stream, LZMA_RUN);
-		if(step == LZMA_STREAM_END || is.eof())
+		if(step == LZMA_STREAM_END)
 			break;
 		if(step != LZMA_OK)
 		{
