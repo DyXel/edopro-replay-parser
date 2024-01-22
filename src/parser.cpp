@@ -227,7 +227,5 @@ auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
 			return {false, {}, {}, {}};
 		}
 	} while(sentry != buffer);
-	assert(orm_buffer != nullptr);
-	assert(orm_size != 0);
 	return {true, ctx.serialize(), orm_buffer, orm_size};
 }
