@@ -12,7 +12,8 @@
 #include "replay_data.hpp"
 
 auto decompress(std::string_view exe, ExtendedReplayHeader const& header,
-                uint8_t* const& replay_buffer, size_t replay_buffer_size, size_t max_size) noexcept
+                uint8_t const* replay_buffer, size_t replay_buffer_size,
+                size_t max_size) noexcept
 	-> std::vector<uint8_t>;
 
 #endif // ERP_DECOMPRESS_HPP
