@@ -405,7 +405,7 @@ auto main(int argc, char* argv[]) -> int
 		std::vector<Response> resps;
 		decltype(ptr_to_resps) const sentry =
 			analysis->old_replay_mode_buffer + analysis->old_replay_mode_size;
-		do
+		while(sentry != ptr_to_resps)
 		{
 			assert(ptr_to_resps < sentry);
 			auto const size = size_t{read<uint8_t>(ptr_to_resps)};
@@ -414,7 +414,7 @@ auto main(int argc, char* argv[]) -> int
 			assert(resp.data() != nullptr);
 			std::memcpy(resp.data(), ptr_to_resps, size);
 			ptr_to_resps += size;
-		} while(sentry != ptr_to_resps);
+		}
 		// Print responses
 		std::cout << "{\"responses\":[";
 		auto* pad1 = "";
