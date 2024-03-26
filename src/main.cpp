@@ -256,7 +256,7 @@ auto main(int argc, char* argv[]) -> int
 	   !print_duel_msgs_opt && !print_duel_resps_opt)
 		return EXIT_SUCCESS;
 	uint64_t duel_flags{};
-	auto ptr_to_msgs = [&]() -> uint8_t*
+	auto ptr_to_msgs = [&, &yrpx_header=yrpx_header]() -> uint8_t*
 	{
 		auto* ptr = pth_buf.data();
 		skip_duelists(yrpx_header.base.flags, ptr);
