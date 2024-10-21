@@ -13,7 +13,6 @@
 #include <ygopen/client/frame.hpp>
 #include <ygopen/client/parse_event.hpp>
 #include <ygopen/client/parse_query.hpp>
-#include <ygopen/client/value_wrappers.hpp>
 #include <ygopen/codec/edo9300_ocgcore_encode.hpp>
 #include <ygopen/proto/replay.hpp>
 
@@ -28,7 +27,7 @@ public:
 	ReplayContext() noexcept
 		: board_()
 		, arena_()
-		, replay_(*PBArena::CreateMessage<YGOpen::Proto::Replay>(&arena_))
+		, replay_(*PBArena::Create<YGOpen::Proto::Replay>(&arena_))
 		, match_win_reason_(0)
 		, left_()
 	{}
@@ -142,7 +141,7 @@ public:
 	{
 		std::string out;
 		auto options = google::protobuf::util::JsonPrintOptions{};
-		options.always_print_primitive_fields = true;
+		options.always_print_fields_with_no_presence = true;
 		options.always_print_enums_as_ints = true;
 		(void)google::protobuf::util::MessageToJsonString(replay_, &out,
 		                                                  options);
@@ -150,11 +149,43 @@ public:
 	}
 
 private:
-	template<typename T>
-	using WrapperType = YGOpen::Client::Value<T>;
-	using CardType = YGOpen::Client::BasicCard<WrapperType>;
-	using FrameType = YGOpen::Client::BasicFrame<CardType>;
-	using BoardType = YGOpen::Client::BasicBoard<FrameType, WrapperType>;
+	struct CardTraits
+	{
+		using OwnerType = YGOpen::Duel::Controller;
+		using IsPublicType = bool;
+		using IsHiddenType = bool;
+		using PositionType = YGOpen::Duel::Position;
+		using StatusType = YGOpen::Duel::Status;
+		using CodeType = uint32_t;
+		using TypeType = YGOpen::Duel::Type;
+		using LevelType = uint32_t;
+		using XyzRankType = uint32_t;
+		using AttributeType = YGOpen::Duel::Attribute;
+		using RaceType = YGOpen::Duel::Race;
+		using AtkDefType = int32_t;
+		using PendScalesType = uint32_t;
+		using LinkRateType = uint32_t;
+		using LinkArrowType = YGOpen::Duel::LinkArrow;
+		using CountersType = std::vector<YGOpen::Proto::Duel::Counter>;
+		using EquippedType = YGOpen::Proto::Duel::Place;
+		using RelationsType = std::vector<YGOpen::Proto::Duel::Place>;
+	};
+
+	using CardType = YGOpen::Client::BasicCard<CardTraits>;
+
+	struct BoardTraits
+	{
+		using BlockedZonesType = std::vector<YGOpen::Proto::Duel::Place>;
+		using ChainStackType = std::vector<YGOpen::Proto::Duel::Chain>;
+		using FrameType = YGOpen::Client::BasicFrame<CardType>;
+		using LPType = uint32_t;
+		using PhaseType = YGOpen::Duel::Phase;
+		using TurnControllerType = YGOpen::Duel::Controller;
+		using TurnType = uint32_t;
+	};
+
+	using BoardType = YGOpen::Client::BasicBoard<BoardTraits>;
+
 	BoardType board_;
 	PBArena arena_;
 	YGOpen::Proto::Replay& replay_;
