@@ -132,8 +132,8 @@ constexpr auto skip_duelists(uint32_t flags, uint8_t*& ptr) noexcept -> unsigned
 	return num_duelists;
 }
 
-constexpr auto read_duel_flags(uint32_t flags, uint8_t*& ptr) noexcept
-	-> uint64_t
+constexpr auto read_duel_flags(uint32_t flags,
+                               uint8_t*& ptr) noexcept -> uint64_t
 {
 	if((flags & REPLAY_64BIT_DUELFLAG) != 0U)
 		return read<uint64_t>(ptr);
@@ -141,8 +141,8 @@ constexpr auto read_duel_flags(uint32_t flags, uint8_t*& ptr) noexcept
 		return static_cast<uint64_t>(read<uint32_t>(ptr));
 }
 
-constexpr auto read_until_decks(uint32_t flags, uint8_t*& ptr) noexcept
-	-> unsigned
+constexpr auto read_until_decks(uint32_t flags,
+                                uint8_t*& ptr) noexcept -> unsigned
 {
 	auto const num_duelists = skip_duelists(flags, ptr);
 	ptr += sizeof(uint32_t) * 3; // starting_lp, etc...
@@ -256,7 +256,7 @@ auto main(int argc, char* argv[]) -> int
 	   !print_duel_msgs_opt && !print_duel_resps_opt)
 		return EXIT_SUCCESS;
 	uint64_t duel_flags{};
-	auto ptr_to_msgs = [&, &yrpx_header=yrpx_header]() -> uint8_t*
+	auto ptr_to_msgs = [&, &yrpx_header = yrpx_header]() -> uint8_t*
 	{
 		auto* ptr = pth_buf.data();
 		skip_duelists(yrpx_header.base.flags, ptr);
@@ -272,7 +272,7 @@ auto main(int argc, char* argv[]) -> int
 	{
 		// with core version 10, the query for card race was changed from 32 bit
 		// to 64 bit, breaking any message using it, drop such replays for now
-		std::cerr << exe << ": Version of core used in this replay is too old.\n";
+		std::cerr << exe << ": Core version for this replay is too old.\n";
 		return EXIT_FAILURE;
 	}
 	if(needs_analysis)
@@ -303,8 +303,8 @@ auto main(int argc, char* argv[]) -> int
 			return EXIT_FAILURE; // NOTE: Error printed by `read_header`.
 		yrp_header = header;
 		auto header_size = (header.base.flags & REPLAY_EXTENDED_HEADER) != 0
-		               ? sizeof(ExtendedReplayHeader)
-		               : sizeof(ReplayHeader);
+		                       ? sizeof(ExtendedReplayHeader)
+		                       : sizeof(ReplayHeader);
 		analysis->old_replay_mode_buffer += header_size;
 		analysis->old_replay_mode_size -= header_size;
 		if((header.base.flags & REPLAY_COMPRESSED) != 0)

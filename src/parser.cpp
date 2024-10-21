@@ -69,8 +69,8 @@ public:
 		return taken;
 	}
 
-	auto xyz_left(Place const& left, Place const& from) noexcept
-		-> void override
+	auto xyz_left(Place const& left,
+	              Place const& from) noexcept -> void override
 	{
 		left_[left] = from;
 	}
@@ -198,8 +198,8 @@ private:
 
 } // namespace
 
-auto analyze(std::string_view exe, uint8_t* buffer, size_t size) noexcept
-	-> AnalyzeResult
+auto analyze(std::string_view exe, uint8_t* buffer,
+             size_t size) noexcept -> AnalyzeResult
 {
 	decltype(buffer) const sentry = buffer + size;
 	uint8_t* orm_buffer = nullptr;
