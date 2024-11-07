@@ -10,6 +10,7 @@
 #include <map>
 #include <ygopen/client/board.hpp>
 #include <ygopen/client/card.hpp>
+#include <ygopen/client/default_card_traits.hpp>
 #include <ygopen/client/frame.hpp>
 #include <ygopen/client/parse_event.hpp>
 #include <ygopen/client/parse_query.hpp>
@@ -102,36 +103,14 @@ public:
 			auto const hits = parse_query<true>(board_.frame(), *it);
 			auto* data = it->mutable_data();
 			using namespace YGOpen::Client;
-#define X(v, q)                           \
-	do                                    \
-	{                                     \
-		if(!!(hits & (QueryCacheHit::q))) \
-			data->clear_##v();            \
-	} while(0)
-			X(owner, OWNER);
-			X(is_public, IS_PUBLIC);
-			X(is_hidden, IS_HIDDEN);
-			X(position, POSITION);
-			X(cover, COVER);
-			X(status, STATUS);
-			X(code, CODE);
-			X(alias, ALIAS);
-			X(type, TYPE);
-			X(level, LEVEL);
-			X(xyz_rank, XYZ_RANK);
-			X(attribute, ATTRIBUTE);
-			X(race, RACE);
-			X(base_atk, BASE_ATK);
-			X(atk, ATK);
-			X(base_def, BASE_DEF);
-			X(def, DEF);
-			X(pend_l_scale, PEND_L_SCALE);
-			X(pend_r_scale, PEND_R_SCALE);
-			X(link_rate, LINK_RATE);
-			X(link_arrow, LINK_ARROW);
-			X(counters, COUNTERS);
-			X(equipped, EQUIPPED);
-			X(relations, RELATIONS);
+#define X(NAME, Name, name, value)       \
+	if(!!(hits & (QueryCacheHit::NAME))) \
+		data->clear_##name();
+#define EXPAND_ARRAY_LIKE_QUERIES
+#define EXPAND_SEPARATE_LINK_DATA_QUERIES
+#include <ygopen/client/queries.inl>
+#undef EXPAND_SEPARATE_LINK_DATA_QUERIES
+#undef EXPAND_ARRAY_LIKE_QUERIES
 #undef X
 			++it;
 		}
@@ -149,29 +128,8 @@ public:
 	}
 
 private:
-	struct CardTraits
-	{
-		using OwnerType = YGOpen::Duel::Controller;
-		using IsPublicType = bool;
-		using IsHiddenType = bool;
-		using PositionType = YGOpen::Duel::Position;
-		using StatusType = YGOpen::Duel::Status;
-		using CodeType = uint32_t;
-		using TypeType = YGOpen::Duel::Type;
-		using LevelType = uint32_t;
-		using XyzRankType = uint32_t;
-		using AttributeType = YGOpen::Duel::Attribute;
-		using RaceType = YGOpen::Duel::Race;
-		using AtkDefType = int32_t;
-		using PendScalesType = uint32_t;
-		using LinkRateType = uint32_t;
-		using LinkArrowType = YGOpen::Duel::LinkArrow;
-		using CountersType = std::vector<YGOpen::Proto::Duel::Counter>;
-		using EquippedType = YGOpen::Proto::Duel::Place;
-		using RelationsType = std::vector<YGOpen::Proto::Duel::Place>;
-	};
-
-	using CardType = YGOpen::Client::BasicCard<CardTraits>;
+	using CardType =
+		YGOpen::Client::BasicCard<YGOpen::Client::DefaultCardTraits>;
 
 	struct BoardTraits
 	{
